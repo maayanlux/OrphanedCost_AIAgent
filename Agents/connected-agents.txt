@@ -1,0 +1,8 @@
+Activate this agent after the /analyze endpoint has completed successfully.
+If the analysis result contains orphaned resources, trigger this connected agent once for each subscription found.
+Pass the following data:
+subscription_id
+resource_ids (list of orphaned resource IDs)
+start_date and end_date (from user input or last month's costs). 
+
+The agent should then call the /cost-analysis endpoint to calculate total and per-resource costs, and return summarized results to Agent 1.

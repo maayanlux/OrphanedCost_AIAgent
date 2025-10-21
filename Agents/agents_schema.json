@@ -1,0 +1,300 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Orphaned Resources Analyzer API",
+    "description": "Azure Function API for analyzing orphaned Azure resources and performing cost analysis.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "",
+      "description": "Azure Function App endpoint"
+    }
+  ],
+  "paths": {
+    "": {
+      "post": {
+        "summary": "Analyze orphaned resources",
+        "description": "Analyzes orphaned Azure resources in a subscription or across all accessible subscriptions. Returns orphaned resource details and summary stats.",
+        "operationId": "OrphanedResourcesAnalyzer",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "subscription_id"
+                ],
+                "properties": {
+                  "subscription_id": {
+                    "type": "string",
+                    "description": "Azure subscription ID",
+                    "example": "12345678-1234-1234-1234-123456789abc"
+                  },
+                  "resource_types": {
+                    "type": "array",
+                    "description": "List of resource types to filter (optional)",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "Public IP",
+                        "Managed Disk",
+                        "Snapshot",
+                        "Network Interface",
+                        "VM without AHB",
+                        "Advisor Recommendation"
+                      ]
+                    },
+                    "example": [
+                      "Public IP",
+                      "Managed Disk"
+                    ]
+                  },
+                  "resource_group": {
+                    "type": "string",
+                    "description": "Optional resource group filter",
+                    "example": "rg-production"
+                  },
+                  "location": {
+                    "type": "string",
+                    "description": "Optional Azure region filter",
+                    "example": "eastus"
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Optional cost analysis start date (ISO 8601 format)",
+                    "example": "2025-09-01T00:00:00Z"
+                  },
+                  "end_date": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Optional cost analysis end date (ISO 8601 format)",
+                    "example": "2025-09-30T23:59:59Z"
+                  },
+                  "include_costs": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Whether to include cost analysis for orphaned resources",
+                    "example": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful orphaned resource analysis",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "subscription_id": {
+                      "type": "string"
+                    },
+                    "analysis_date": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "resources": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "resource_type": {
+                            "type": "string"
+                          },
+                          "resource_id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "location": {
+                            "type": "string"
+                          },
+                          "resource_group": {
+                            "type": "string"
+                          },
+                          "subscription_id": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "summary": {
+                      "type": "object",
+                      "properties": {
+                        "total_resources": {
+                          "type": "integer"
+                        },
+                        "by_type": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "integer"
+                          }
+                        },
+                        "total_potential_savings": {
+                          "type": "number",
+                          "format": "float"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Unauthorized - missing or invalid function key"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "": {
+      "post": {
+        "summary": "Run direct cost analysis",
+        "description": "Queries Azure Cost Management API for specific resources, subscriptions, or resource groups.",
+        "operationId": "CostAnalysisDirectQuery",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "subscription_id",
+                  "query_type",
+                  "start_date",
+                  "end_date"
+                ],
+                "properties": {
+                  "subscription_id": {
+                    "type": "string",
+                    "description": "Azure subscription ID"
+                  },
+                  "query_type": {
+                    "type": "string",
+                    "enum": [
+                      "subscription",
+                      "resource_group",
+                      "service",
+                      "top_resources",
+                      "budget",
+                      "location",
+                      "specific_resources"
+                    ],
+                    "description": "Type of cost analysis query to run"
+                  },
+                  "resource_group": {
+                    "type": "string",
+                    "description": "For resource_group query type"
+                  },
+                  "service_names": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "For service query type"
+                  },
+                  "resource_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "For specific_resources query type"
+                  },
+                  "top_n": {
+                    "type": "integer",
+                    "description": "Number of top resources to return (for top_resources)"
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Start date for cost query (interpreted relative to the current year when natural-language dates like 'last month' are used; must be in ISO 8601 format)"
+                  },
+                  "end_date": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "End date for cost query"
+                  },
+                  "granularity": {
+                    "type": "string",
+                    "enum": [
+                      "Daily",
+                      "Monthly",
+                      "None"
+                    ],
+                    "default": "Daily",
+                    "description": "Cost data granularity"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful cost analysis",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "subscription_id": {
+                      "type": "string"
+                    },
+                    "analysis_type": {
+                      "type": "string"
+                    },
+                    "total_cost": {
+                      "type": "number"
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "cost": {
+                            "type": "number"
+                          },
+                          "data": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Unauthorized - missing or invalid function key"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    }
+  }
+}
