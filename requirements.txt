@@ -1,0 +1,14 @@
+azure-functions
+azure-identity>=1.15.0
+azure-core>=1.29.0
+azure-mgmt-compute>=30.0.0
+azure-mgmt-network>=25.0.0
+azure-mgmt-advisor>=9.0.0
+azure-mgmt-costmanagement>=4.0.0
+azure-mgmt-resource>=23.0.0
+azure-mgmt-subscription>=3.1.1
+azure-monitor-query>=1.2.0
+azure-ai-projects>=1.0.0
+openai>=1.0.0
+requests>=2.25.0
+python-dateutil>=2.8.2
