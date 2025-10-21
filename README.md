@@ -23,15 +23,6 @@ graph TB
         RG[Resource Graph API]
     end
     
-    subgraph "Azure Resources"
-        VM[Virtual Machines]
-        ST[Storage Accounts]
-        NIC[Network Interfaces]
-        IP[Public IP Addresses]
-        DISK[Managed Disks]
-        NSG[Network Security Groups]
-    end
-    
     Agent --> F1
     Agent --> F2
     Agent --> F3
@@ -42,20 +33,6 @@ graph TB
     F2 --> ARM
     F3 --> CM
     F4 --> CM
-    
-    ARM --> VM
-    ARM --> ST
-    ARM --> NIC
-    ARM --> IP
-    ARM --> DISK
-    ARM --> NSG
-    
-    CM --> VM
-    CM --> ST
-    CM --> NIC
-    CM --> IP
-    CM --> DISK
-    CM --> NSG
 ```
 
 ## 🚀 Features
