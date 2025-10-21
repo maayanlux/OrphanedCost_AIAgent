@@ -106,7 +106,27 @@ graph TB
 
 This application is designed to be triggered by Azure AI Foundry agents for intelligent resource management and cost optimization.
 
-### Agent Configuration
+### 🔧 Agent Setup Requirements
+
+**Before configuring agents, you must:**
+
+1. **Deploy the Azure Functions** to your Azure subscription
+2. **Get the Function App URL**: `https://YOUR-FUNCTION-APP-NAME.azurewebsites.net`
+3. **Obtain Function Keys** from Azure portal:
+   - Navigate to your Function App → Functions → `OrphanedResourcesAnalyzer` → Function Keys
+   - Copy the `default` key or create a new one
+   - Navigate to your Function App → Functions → `CostAnalysisDirectQuery` → Function Keys  
+   - Copy the `default` key or create a new one
+
+### 🎯 Required Configuration Updates
+
+**Update the agent schema with YOUR deployed function details:**
+
+- **Replace `YOUR-FUNCTION-APP-NAME`** with your actual Azure Function App name
+- **Replace `YOUR-FUNCTION-KEY`** with your actual function keys from Azure portal
+- **Update server URLs** in the OpenAPI schema with your function endpoints
+
+### Agents Configuration
 
 **Agent Schema** (to be customized):
 ```json
@@ -186,6 +206,30 @@ This application is designed to be triggered by Azure AI Foundry agents for inte
   "end_date": "2025-10-01"
 }
 ```
+
+### 🔧 Agent Configuration Instructions
+
+**To configure your Azure AI Foundry agents with this function:**
+
+1. **Deploy your Azure Functions** and note your function app name
+2. **Get your function keys** from Azure portal (Function App → Functions → Function Keys)
+3. **Update the agent schema** with your specific endpoints:
+   - Replace `YOUR-FUNCTION-APP-NAME` with your actual function app name
+   - Replace `YOUR-FUNCTION-KEY` with your actual function keys
+   - Use these endpoints:
+     - **Orphaned Resources**: `POST https://YOUR-FUNCTION-APP-NAME.azurewebsites.net/api/analyze?code=YOUR-FUNCTION-KEY`
+     - **Cost Analysis**: `POST https://YOUR-FUNCTION-APP-NAME.azurewebsites.net/api/cost-analysis?code=YOUR-FUNCTION-KEY`
+
+4. **Update the OpenAPI server URL** in your agent schema:
+   ```json
+   "servers": [
+     {
+       "url": "https://YOUR-FUNCTION-APP-NAME.azurewebsites.net/api"
+     }
+   ]
+   ```
+
+⚠️ **Security**: Never commit actual function keys to version control. Use placeholders in templates.
 
 ## 🛠️ Technical Implementation
 
