@@ -56,7 +56,7 @@ graph TB
 - **Intelligent Recommendations**: AI-powered cost optimization suggestions
 - **Automated Reporting**: Structured data output for agent consumption
 
-## 📋 Azure Functions API Reference
+## 📋 Azure Functions
 
 ### 1. OrphanedResourcesAnalyzer
 **Endpoint**: `/api/orphaned-resources`  
@@ -115,6 +115,15 @@ All agent configurations, instructions, and schemas are located in the **`Agents
 - **`agents_schema.json`** - Complete OpenAPI schema for both agents
 - **`connected-agents.txt`** - Connection and deployment instructions
 
+### Quick Setup Guide
+
+1. **Deploy your Azure Functions** to your Azure subscription
+2. **Get your function keys** from Azure portal (Function App → Functions → Function Keys)
+3. **Update the configuration files** in the `Agents/` folder with your deployment details:
+   - Replace `YOUR-FUNCTION-APP-NAME` with your actual function app name
+   - Replace `YOUR-FUNCTION-KEY` with your actual function keys
+4. **Use the files in the `Agents/` folder** to configure your Azure AI Foundry agents
+
 ### Agent Architecture
 
 This application provides **two specialized agents** that work together:
@@ -131,16 +140,64 @@ This application provides **two specialized agents** that work together:
 - **Cost Optimization**: Immediate identification of potential savings
 - **Flexible Deployment**: Support for single subscription or tenant-wide analysis
 
-### Quick Setup Guide
+## 🛠️ Technical Implementation
 
-1. **Deploy your Azure Functions** to your Azure subscription
-2. **Get your function keys** from Azure portal (Function App → Functions → Function Keys)
-3. **Update the configuration files** in the `Agents/` folder with your deployment details:
-   - Replace `YOUR-FUNCTION-APP-NAME` with your actual function app name
-   - Replace `YOUR-FUNCTION-KEY` with your actual function keys
-4. **Use the files in the `Agents/` folder** to configure your Azure AI Foundry agents
+### Core Technologies
+When receiving a relative time range such as “last month” or “previous billing cycle,”
+resolve the dates relative to the current year (today’s system date), not a default 2023.
+If only month names are given (e.g., “September”), assume the **most recent** September that has fully passed.
+Always pass start_date and end_date in ISO 8601 format (UTC).
 
-⚠️ **Security Note**: Never commit actual function keys to version control. Use placeholders in templates.
+## 🧠 Agent Integration
+
+All Azure AI Foundry agent configurations, OpenAPI schemas, and integration instructions are available in the `Agents/` folder.
+
+
+1. **Setup Agent Connection**:
+   - Configure the agent to connect to your deployed Azure Functions endpoint
+   - Set up authentication using Function Keys or Azure AD
+   - Configure retry policies for rate limiting handling
+
+2. **Function Endpoint URLs**:
+   ```
+   Base URL: https://your-function-app.azurewebsites.net/api/
+   
+   Orphaned Resources: POST /orphaned-resources
+   Cost Analysis: POST /cost-analysis
+   ```
+
+3. **Authentication Headers**:
+   ```
+   x-functions-key: YOUR_FUNCTION_KEY
+   Content-Type: application/json
+   ```
+
+4. **Rate Limiting Considerations**:
+   - Functions implement ClientType headers to optimize Azure API rate limits
+   - Progressive delays between resource queries (2s + 0.5s per resource)
+   - Automatic retry logic with exponential backoff
+
+### 🔧 Deployment-Specific Configuration Example
+
+**After deploying your Azure Functions, update the agent configuration:**
+
+```json
+// Example with actual deployed function app
+{
+  "servers": [
+    {
+      "url": "https://funcorphanedcostpremium.azurewebsites.net/api",
+      "description": "Production Azure Function App endpoint"
+    }
+  ]
+}
+```
+
+**Function endpoints with authentication:**
+- **Orphaned Resources**: `POST /analyze?code=YOUR-ORPHANED-RESOURCES-FUNCTION-KEY`
+- **Cost Analysis**: `POST /cost-analysis?code=YOUR-COST-ANALYSIS-FUNCTION-KEY`
+
+⚠️ **Security Note**: Replace `YOUR-ORPHANED-RESOURCES-FUNCTION-KEY` and `YOUR-COST-ANALYSIS-FUNCTION-KEY` with your actual function keys from Azure portal.
 
 ## 🛠️ Technical Implementation
 
@@ -162,19 +219,13 @@ This application provides **two specialized agents** that work together:
 #### Cost Analysis Accuracy
 - **Direct API Integration**: Real-time cost data from Azure Cost Management
 - **Date Range Handling**: Auto-calculation for "last 30 days" or custom ranges
+- **2023→2025 Date Correction**: Handles agent date format inconsistencies
 - **Resource-Specific Filtering**: Precise cost attribution per resource
-- **Date Format Standardization**: ISO 8601 format (UTC) for all date ranges
 
 #### Azure Hybrid Benefit Detection
 - **OS-Specific Filtering**: Only Windows Server, RHEL, and SLES eligible
 - **License Optimization**: Identifies VMs that could benefit from AHB
 - **Cost Impact Analysis**: Calculates potential savings from AHB implementation
-
-### Date Handling Guidelines
-When receiving a relative time range such as "last month" or "previous billing cycle":
-- Resolve dates relative to the current year (today's system date), not a default 2023
-- If only month names are given (e.g., "September"), assume the **most recent** September that has fully passed
-- Always pass start_date and end_date in ISO 8601 format (UTC)
 
 ## 📁 Project Structure
 
@@ -231,16 +282,4 @@ func azure functionapp publish your-function-app-name
 - **Azure Hybrid Benefit**: Windows Server, RHEL, SLES only
 - **Cost Integration**: Optional cost analysis for detected resources
 
-### Required Azure Permissions
-This application requires appropriate Azure permissions for:
-- **Cost Management API**: Reader role on subscription/billing scope
-- **Resource Graph API**: Reader role on subscription
-- **Azure Resource Manager**: Reader role on subscription
-
-Ensure your service principal or managed identity has the necessary roles assigned.
-
-## 📖 Additional Resources
-
-- **Azure Functions Documentation**: [docs.microsoft.com/azure/azure-functions](https://docs.microsoft.com/azure/azure-functions)
-- **Azure Cost Management API**: [docs.microsoft.com/rest/api/cost-management](https://docs.microsoft.com/rest/api/cost-management)
-- **Azure AI Foundry**: [docs.microsoft.com/azure/ai-foundry](https://docs.microsoft.com/azure/ai-foundry)
+**Note**: This application requires appropriate Azure permissions for Cost Management and Resource Graph APIs. Ensure your service principal or managed identity has the necessary roles assigned.
