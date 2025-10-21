@@ -127,8 +127,295 @@ This application is designed to be triggered by Azure AI Foundry agents for inte
 - **Update server URLs** in the OpenAPI schema with your function endpoints
 
 ### Agents Configuration
+#### Agent-OrphanedResources instructions
 
-**Agent Schema** (to be customized):
+You are Agent 1 — the "Azure Orphaned Resource Analyzer."
+
+### 🎯 Goal
+Identify orphaned Azure resources across a specific subscription or across **all accessible subscriptions in the tenant** if none is provided.
+
+### ⚙️ Primary Task
+Call the following endpoint:
+**POST** `https://YOUR-FUNCTION-APP-NAME.azurewebsites.net/api/analyze?code=YOUR-FUNCTION-KEY`
+with a JSON body.  
+
+If the user specifies a subscription, include `"subscription_id"`.  
+Otherwise, **omit it** to perform a **tenant-wide analysis**.
+
+Example body:
+```json
+{
+  "resource_types": ["Public IP", "Managed Disk", "Network Interface", "VM without AHB"],
+  "include_costs": true
+}
+
+### 🕒 Date Interpretation Rules
+- When the user provides an explicit date range (e.g., “September 1–30, 2025”), always use the year and month as stated.
+- When the user provides a relative date (e.g., “last month”, “past 30 days”, “this year”), resolve it relative to the **current system date**, not 2023!!.
+- If no dates are provided:
+  - `start_date` = 30 days ago (UTC)
+  - `end_date` = current UTC time
+- Always format dates in ISO 8601 (`YYYY-MM-DDTHH:MM:SSZ`).
+
+### 🎯 Resource Filtering Rules
+- Always honor the specific resource type(s) the user mentions.
+  - Example: if the user says “orphaned Managed Disks,” include only `"Managed Disk"` in `resource_types`.
+  - If multiple types are mentioned (e.g., “Public IPs and NICs”), include both.
+  - If the user doesn’t specify a resource type, analyze all supported types.
+- Populate the `resource_types` array in the `/analyze` request body with the exact names that match the API’s enum:
+  ["Public IP", "Managed Disk", "Snapshot", "Network Interface", "VM without AHB", "Advisor Recommendation"]
+
+
+
+#### Agent-Orphaned-Cost instructions
+You are Agent 2 — the "Azure Cost Analysis Agent."
+
+### 🎯 Goal
+Calculate the cost impact of orphaned Azure resources identified by Agent 1.
+
+You work **per subscription**: for each subscription sent by Agent 1, you query the Azure Cost Management API through the `/cost-analysis` function to determine cost and savings potential.
+
+---
+
+### ⚙️ Primary Task
+Call:
+**POST** `https://YOUR-FUNCTION-APP-NAME.azurewebsites.net/api/cost-analysis?code=YOUR-FUNCTION-KEY`
+
+with this JSON body:
+```json
+{
+  "subscription_id": "<subscription_id>",
+  "query_type": "specific_resources",
+  "resource_ids": [ "<resource_id1>", "<resource_id2>", ... ],
+  "start_date": "<ISO start date>",
+  "end_date": "<ISO end date>"
+}
+
+### 🕒 Date Interpretation
+When receiving a relative time range such as “last month” or “previous billing cycle,”
+resolve the dates relative to the current year (today’s system date), not a default 2023.
+If only month names are given (e.g., “September”), assume the **most recent** September that has fully passed.
+Always pass start_date and end_date in ISO 8601 format (UTC).
+
+### 📋 Complete OpenAPI Schema for Agents
+
+**Instructions**: Replace the placeholders below with your actual deployment details before using this schema.
+
+```json
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Orphaned Resources Analyzer API",
+    "description": "Azure Function API for analyzing orphaned Azure resources and performing cost analysis.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://YOUR-FUNCTION-APP-NAME.azurewebsites.net/api",
+      "description": "Azure Function App endpoint - REPLACE with your actual function app name"
+    }
+  ],
+  "paths": {
+    "/analyze": {
+      "post": {
+        "summary": "Analyze Orphaned Resources",
+        "description": "Identifies orphaned Azure resources across subscriptions",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Azure Function authentication key"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "subscription_id": {
+                    "type": "string",
+                    "description": "Azure subscription ID (optional for tenant-wide analysis)"
+                  },
+                  "resource_types": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": ["Public IP", "Managed Disk", "Snapshot", "Network Interface", "VM without AHB", "Advisor Recommendation"]
+                    },
+                    "description": "Types of resources to analyze"
+                  },
+                  "resource_group": {
+                    "type": "string",
+                    "description": "Optional resource group filter"
+                  },
+                  "include_costs": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Include cost analysis for found resources"
+                  },
+                  "cost_period_days": {
+                    "type": "integer",
+                    "default": 30,
+                    "description": "Number of days for cost analysis"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful analysis",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "orphaned_resources": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "resource_id": {"type": "string"},
+                          "resource_name": {"type": "string"},
+                          "resource_type": {"type": "string"},
+                          "resource_group": {"type": "string"},
+                          "subscription_id": {"type": "string"},
+                          "location": {"type": "string"},
+                          "cost": {"type": "number"}
+                        }
+                      }
+                    },
+                    "summary": {
+                      "type": "object",
+                      "properties": {
+                        "total_resources": {"type": "integer"},
+                        "total_cost": {"type": "number"},
+                        "potential_savings": {"type": "number"}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cost-analysis": {
+      "post": {
+        "summary": "Cost Analysis for Resources",
+        "description": "Analyzes costs for specific Azure resources",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Azure Function authentication key"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["subscription_id"],
+                "properties": {
+                  "subscription_id": {
+                    "type": "string",
+                    "description": "Azure subscription ID"
+                  },
+                  "query_type": {
+                    "type": "string",
+                    "enum": ["specific_resources", "resource_group", "service", "top_resources", "subscription"],
+                    "default": "specific_resources",
+                    "description": "Type of cost query"
+                  },
+                  "resource_ids": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Array of resource IDs for specific_resources query"
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Start date in YYYY-MM-DD format"
+                  },
+                  "end_date": {
+                    "type": "string",
+                    "format": "date", 
+                    "description": "End date in YYYY-MM-DD format"
+                  },
+                  "granularity": {
+                    "type": "string",
+                    "enum": ["Daily", "Monthly"],
+                    "default": "Daily",
+                    "description": "Data granularity"
+                  },
+                  "top_n": {
+                    "type": "integer",
+                    "default": 10,
+                    "description": "Number of top resources for top_resources query"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful cost analysis",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "costs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "resource_id": {"type": "string"},
+                          "cost": {"type": "number"},
+                          "currency": {"type": "string"},
+                          "date_range": {"type": "string"}
+                        }
+                      }
+                    },
+                    "total_cost": {"type": "number"},
+                    "processing_info": {
+                      "type": "object",
+                      "properties": {
+                        "total_resources": {"type": "integer"},
+                        "resources_with_costs": {"type": "integer"},
+                        "query_duration": {"type": "string"}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+### 🤖 Agent Schema Configuration
+
+**Agent Schema** (customize with your deployment details):
 ```json
 {
   "name": "AzureCostOptimizationAgent",
@@ -138,18 +425,18 @@ This application is designed to be triggered by Azure AI Foundry agents for inte
       "name": "analyze_orphaned_resources",
       "description": "Detect and analyze orphaned Azure resources",
       "parameters": {
-        "subscription_id": {"type": "string", "required": true},
-        "resource_types": {"type": "array", "items": {"type": "string"}},
-        "include_costs": {"type": "boolean", "default": true}
+        "subscription_id": {"type": "string", "required": false, "description": "Azure subscription ID (optional for tenant-wide analysis)"},
+        "resource_types": {"type": "array", "items": {"type": "string"}, "description": "Types of resources to analyze"},
+        "include_costs": {"type": "boolean", "default": true, "description": "Include cost analysis"}
       }
     },
     {
       "name": "analyze_resource_costs",
       "description": "Analyze costs for specific Azure resources",
       "parameters": {
-        "subscription_id": {"type": "string", "required": true},
-        "resource_ids": {"type": "array", "items": {"type": "string"}},
-        "date_range_days": {"type": "integer", "default": 30}
+        "subscription_id": {"type": "string", "required": true, "description": "Azure subscription ID"},
+        "resource_ids": {"type": "array", "items": {"type": "string"}, "description": "Array of resource IDs"},
+        "date_range_days": {"type": "integer", "default": 30, "description": "Number of days for analysis"}
       }
     }
   ]
@@ -157,6 +444,323 @@ This application is designed to be triggered by Azure AI Foundry agents for inte
 ```
 
 ### Integration Instructions
+
+**Instructions**: Replace the placeholders below with your actual deployment details before using this schema.
+
+```json
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Orphaned Resources Analyzer API",
+    "description": "Azure Function API for analyzing orphaned Azure resources and performing cost analysis.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://YOUR-FUNCTION-APP-NAME.azurewebsites.net/api",
+      "description": "Azure Function App endpoint - REPLACE with your actual function app name"
+    }
+  ],
+  "paths": {
+    "": {
+      "post": {
+        "summary": "Analyze orphaned resources",
+        "description": "Analyzes orphaned Azure resources in a subscription or across all accessible subscriptions. Returns orphaned resource details and summary stats.",
+        "operationId": "OrphanedResourcesAnalyzer",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "subscription_id"
+                ],
+                "properties": {
+                  "subscription_id": {
+                    "type": "string",
+                    "description": "Azure subscription ID",
+                    "example": "12345678-1234-1234-1234-123456789abc"
+                  },
+                  "resource_types": {
+                    "type": "array",
+                    "description": "List of resource types to filter (optional)",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "Public IP",
+                        "Managed Disk",
+                        "Snapshot",
+                        "Network Interface",
+                        "VM without AHB",
+                        "Advisor Recommendation"
+                      ]
+                    },
+                    "example": [
+                      "Public IP",
+                      "Managed Disk"
+                    ]
+                  },
+                  "resource_group": {
+                    "type": "string",
+                    "description": "Optional resource group filter",
+                    "example": "rg-production"
+                  },
+                  "location": {
+                    "type": "string",
+                    "description": "Optional Azure region filter",
+                    "example": "eastus"
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Optional cost analysis start date (ISO 8601 format)",
+                    "example": "2025-09-01T00:00:00Z"
+                  },
+                  "end_date": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Optional cost analysis end date (ISO 8601 format)",
+                    "example": "2025-09-30T23:59:59Z"
+                  },
+                  "include_costs": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Whether to include cost analysis for orphaned resources",
+                    "example": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful orphaned resource analysis",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "subscription_id": {
+                      "type": "string"
+                    },
+                    "analysis_date": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "resources": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "resource_type": {
+                            "type": "string"
+                          },
+                          "resource_id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "location": {
+                            "type": "string"
+                          },
+                          "resource_group": {
+                            "type": "string"
+                          },
+                          "subscription_id": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "summary": {
+                      "type": "object",
+                      "properties": {
+                        "total_resources": {
+                          "type": "integer"
+                        },
+                        "by_type": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "integer"
+                          }
+                        },
+                        "total_potential_savings": {
+                          "type": "number",
+                          "format": "float"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Unauthorized - missing or invalid function key"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "": {
+      "post": {
+        "summary": "Run direct cost analysis",
+        "description": "Queries Azure Cost Management API for specific resources, subscriptions, or resource groups.",
+        "operationId": "CostAnalysisDirectQuery",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "subscription_id",
+                  "query_type",
+                  "start_date",
+                  "end_date"
+                ],
+                "properties": {
+                  "subscription_id": {
+                    "type": "string",
+                    "description": "Azure subscription ID"
+                  },
+                  "query_type": {
+                    "type": "string",
+                    "enum": [
+                      "subscription",
+                      "resource_group",
+                      "service",
+                      "top_resources",
+                      "budget",
+                      "location",
+                      "specific_resources"
+                    ],
+                    "description": "Type of cost analysis query to run"
+                  },
+                  "resource_group": {
+                    "type": "string",
+                    "description": "For resource_group query type"
+                  },
+                  "service_names": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "For service query type"
+                  },
+                  "resource_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "For specific_resources query type"
+                  },
+                  "top_n": {
+                    "type": "integer",
+                    "description": "Number of top resources to return (for top_resources)"
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Start date for cost query (interpreted relative to the current year when natural-language dates like 'last month' are used; must be in ISO 8601 format)"
+                  },
+                  "end_date": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "End date for cost query"
+                  },
+                  "granularity": {
+                    "type": "string",
+                    "enum": [
+                      "Daily",
+                      "Monthly",
+                      "None"
+                    ],
+                    "default": "Daily",
+                    "description": "Cost data granularity"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful cost analysis",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "subscription_id": {
+                      "type": "string"
+                    },
+                    "analysis_type": {
+                      "type": "string"
+                    },
+                    "total_cost": {
+                      "type": "number"
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "cost": {
+                            "type": "number"
+                          },
+                          "data": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Unauthorized - missing or invalid function key"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+### Integration Instructions
+
+### Connected Agens Instructions
+Activate this agent after the /analyze endpoint has completed successfully.
+If the analysis result contains orphaned resources, trigger this connected agent once for each subscription found.
+Pass the following data:
+subscription_id
+resource_ids (list of orphaned resource IDs)
+start_date and end_date (from user input or last month's costs). 
+
+The agent should then call the /cost-analysis endpoint to calculate total and per-resource costs, and return summarized results to Agent 1.
 
 1. **Setup Agent Connection**:
    - Configure the agent to connect to your deployed Azure Functions endpoint
@@ -207,29 +811,27 @@ This application is designed to be triggered by Azure AI Foundry agents for inte
 }
 ```
 
-### 🔧 Agent Configuration Instructions
+### 🔧 Deployment-Specific Configuration Example
 
-**To configure your Azure AI Foundry agents with this function:**
+**After deploying your Azure Functions, update the agent configuration:**
 
-1. **Deploy your Azure Functions** and note your function app name
-2. **Get your function keys** from Azure portal (Function App → Functions → Function Keys)
-3. **Update the agent schema** with your specific endpoints:
-   - Replace `YOUR-FUNCTION-APP-NAME` with your actual function app name
-   - Replace `YOUR-FUNCTION-KEY` with your actual function keys
-   - Use these endpoints:
-     - **Orphaned Resources**: `POST https://YOUR-FUNCTION-APP-NAME.azurewebsites.net/api/analyze?code=YOUR-FUNCTION-KEY`
-     - **Cost Analysis**: `POST https://YOUR-FUNCTION-APP-NAME.azurewebsites.net/api/cost-analysis?code=YOUR-FUNCTION-KEY`
+```json
+// Example with actual deployed function app
+{
+  "servers": [
+    {
+      "url": "https://funcorphanedcostpremium.azurewebsites.net/api",
+      "description": "Production Azure Function App endpoint"
+    }
+  ]
+}
+```
 
-4. **Update the OpenAPI server URL** in your agent schema:
-   ```json
-   "servers": [
-     {
-       "url": "https://YOUR-FUNCTION-APP-NAME.azurewebsites.net/api"
-     }
-   ]
-   ```
+**Function endpoints with authentication:**
+- **Orphaned Resources**: `POST /analyze?code=YOUR-ORPHANED-RESOURCES-FUNCTION-KEY`
+- **Cost Analysis**: `POST /cost-analysis?code=YOUR-COST-ANALYSIS-FUNCTION-KEY`
 
-⚠️ **Security**: Never commit actual function keys to version control. Use placeholders in templates.
+⚠️ **Security Note**: Replace `YOUR-ORPHANED-RESOURCES-FUNCTION-KEY` and `YOUR-COST-ANALYSIS-FUNCTION-KEY` with your actual function keys from Azure portal.
 
 ## 🛠️ Technical Implementation
 
