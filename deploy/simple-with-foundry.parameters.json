@@ -1,0 +1,48 @@
+{
+  "functionAppName": {
+    "value": "YOUR-FUNCTION-APP-NAME"
+  },
+  "hostingPlanName": {
+    "value": "YOUR-HOSTING-PLAN-NAME"
+  },
+  "aiHubName": {
+    "value": "YOUR-AI-HUB-NAME"
+  },
+  "aiProjectName": {
+    "value": "YOUR-AI-PROJECT-NAME"
+  },
+  "keyVaultName": {
+    "value": "YOUR-KEY-VAULT-NAME"
+  },
+  "environment": {
+    "value": "prod"
+  },
+  "location": {
+    "value": "East US"
+  },
+  "runtime": {
+    "value": "python"
+  },
+  "runtimeVersion": {
+    "value": "3.11"
+  },
+  "skuName": {
+    "value": "Y1"
+  },
+  "deployModel": {
+    "value": true
+  },
+  "modelName": {
+    "value": "gpt-41-mini"
+  },
+  "tags": {
+    "value": {
+      "Environment": "Production",
+      "Application": "Azure Cost Management",
+      "Project": "Cost Optimization",
+      "Owner": "FinOps Team",
+      "CostCenter": "IT-Operations",
+      "Solution": "AI-Powered Cost Analysis"
+    }
+  }
+}
