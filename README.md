@@ -197,6 +197,36 @@ When receiving a relative time range such as "last month" or "previous billing c
 
 ## 🚀 Deployment
 
+### Option 1: Basic Infrastructure Only
+
+Deploy just the Function App infrastructure for cost analysis functions.
+
+<a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FIditbnaya%2FAzure-CostA-Agantic-AI%2Fmain%2Fdeploy%2Fsimple.json" target="_blank">
+<img src="https://aka.ms/deploytoazurebutton" alt="Deploy to Azure"/>
+</a>
+
+**Includes:** Function App + Storage + App Service Plan
+
+### Option 2: Complete AI Agent Infrastructure
+
+Deploy Function App infrastructure plus Azure AI Foundry for agent development.
+
+<a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FIditbnaya%2FAzure-CostA-Agantic-AI%2Fmain%2Fdeploy%2Fsimple-with-foundry.json" target="_blank">
+<img src="https://aka.ms/deploytoazurebutton" alt="Deploy to Azure"/>
+</a>
+
+**Includes:** All Basic Infrastructure + AI Foundry Hub + AI Project
+---
+## 📋 **Prerequisites**
+
+- Azure subscription with appropriate permissions
+- Resource group (will be created if it doesn't exist)
+- Owner or Contributor access to the subscription for RBAC assignments
+
+After deployment, you'll need to deploy the function code using: `func azure functionapp publish [YOUR-FUNCTION-APP-NAME]`
+
+For detailed deployment options and customization, see the [deploy folder](./deploy/).
+
 ### Prerequisites
 - Azure subscription
 - Azure Functions Core Tools
