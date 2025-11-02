@@ -191,7 +191,7 @@ This application provides **two specialized agents** that work together:
 
 ### Core Technologies
 - **Azure Functions v4**: Serverless compute platform
-- **Python 3.7-3.12**: Runtime environment
+- **Python 3.11**: Runtime environment (required version)
 - **Azure SDK for Python**: Azure service integration
 - **Azure Cost Management API**: Real-time cost data
 - **Azure Resource Graph**: Resource querying and filtering
@@ -315,18 +315,9 @@ az role assignment create \
 ```
 
 ### Step 3: Set Up Azure AI Foundry
-1. **Create Azure AI Foundry Hub**:
+1. **Create Azure AI Foundry Project**:
    - Navigate to Azure portal → Create Resource → Azure AI Foundry
-   - Create a new Hub resource in your subscription
-
-2. **Create Azure AI Foundry Project**:
-   - In the Foundry Hub, create a new Project
-   - Configure project settings and compute resources
-
-3. **Configure Agent Connections**:
-   - Use the configuration files in the `Agents/` folder
-   - Update endpoints with your deployed Function App URL
-   - Configure authentication using Function Keys
+   - Create a new Project for agent orchestration
 
 ### Step 4: Local Development
 ```bash
@@ -361,23 +352,12 @@ az functionapp config appsettings set \
 > - Implement additional security controls as needed
 > - Ensure proper network segmentation and access controls
 
-### Required Azure Permissions (Managed Identity)
-The Function App's **System-assigned Managed Identity** requires these specific roles:
-
-#### Function App Storage Access
-- **Storage Blob Data Owner** - Required on the Function App's own storage account
-
-#### Target Subscription/Scope Permissions
-Assign on the subscription(s) or management group you want to analyze:
-- **Reader** - For enumerating and accessing resource details
-- **Cost Management Reader** - For accessing billing and cost data  
-- **Advisor Recommendations Contributor** - For assessments and reviews access
-
-### Infrastructure Configuration
+### Application Configuration
 - **Function Plan**: Premium EP1 minimum (for consistent performance)
 - **Operating System**: Linux (required for Python 3.11 runtime)
 - **Python Version**: 3.11 (specified in function configuration)
 - **Network Access**: Public endpoints (no private endpoint integration)
+- **Authentication**: System-assigned Managed Identity with required permissions (see Infrastructure Requirements above)
 
 ### Cost Analysis Settings
 - **Default Date Range**: Last 30 days
@@ -391,7 +371,6 @@ Assign on the subscription(s) or management group you want to analyze:
 - **Cost Integration**: Optional cost analysis for detected resources
 
 ### Azure AI Foundry Configuration
-- **Foundry Hub**: Required for agent orchestration
 - **Foundry Project**: Workspace for managing agents and connections
 - **Agent Connections**: Configure using files in `Agents/` folder
 - **Authentication**: Function Keys for API access
