@@ -1,9 +1,0 @@
-{
-	"servers": {
-		"cost_mcp": {
-			"url": "https://lamcpserver-hsacdndhg7ekagd9.eastus2-01.azurewebsites.net/api/mcp",
-			"type": "http"
-		}
-	},
-	"inputs": []
-}
