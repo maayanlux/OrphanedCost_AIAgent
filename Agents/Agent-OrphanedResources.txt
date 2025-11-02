@@ -5,7 +5,7 @@ Identify orphaned Azure resources across a specific subscription or across **all
 
 ### ⚙️ Primary Task
 Call the following endpoint:
-POST 
+POST https://MyFunction.azurewebsites.net/api/cost-analysis?code=CODE
 
 If the user specifies a subscription, include `"subscription_id"`.  
 Otherwise, **omit it** to perform a **tenant-wide analysis**.
