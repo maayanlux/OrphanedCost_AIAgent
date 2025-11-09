@@ -16,52 +16,7 @@ This folder contains ready-to-deploy Logic Apps workflows that integrate your Az
 - 📊 **Response Handling**: Returns structured cost analysis results
 - 🔄 **Resource Type Support**: Public IPs, Disks, Network Interfaces, VMs
 
-**Flexible Input Schema** - All fields are optional with intelligent defaults:
-
-**Example 1 - Basic Orphaned Resources Analysis**:
-```json
-{
-  "analysis_type": "orphaned_resources",
-  "resource_types": ["Microsoft.Network/publicIPAddresses", "Microsoft.Compute/disks"],
-  "start_date": "2024-10-01", 
-  "end_date": "2024-11-01",
-  "subscription_id": "12345678-1234-1234-1234-123456789012"
-}
-```
-
-**Example 2 - Custom Analysis with Prompt**:
-```json
-{
-  "custom_prompt": "Find all virtual machines that haven't been accessed in 30 days and calculate potential savings",
-  "subscription_id": "12345678-1234-1234-1234-123456789012",
-  "include_recommendations": true,
-  "output_format": "detailed"
-}
-```
-
-**Example 3 - Multi-Subscription Cost Review**:
-```json
-{
-  "analysis_type": "cost_optimization",
-  "start_date": "2024-11-01",
-  "end_date": "2024-11-09",
-  "output_format": "summary"
-}
-```
-
-**Supported Analysis Types**:
-- `orphaned_resources` - Find unused/unattached resources (default)
-- `cost_optimization` - Identify cost savings opportunities
-- `security_review` - Security configuration analysis
-- `compliance_check` - Compliance and governance review
-
-**Common Resource Types**:
-- `Microsoft.Network/publicIPAddresses` - Public IP addresses
-- `Microsoft.Compute/disks` - Managed disks and snapshots
-- `Microsoft.Network/networkInterfaces` - Network interfaces
-- `Microsoft.Compute/virtualMachines` - Virtual machines
-- `Microsoft.Storage/storageAccounts` - Storage accounts
-- `Microsoft.Network/networkSecurityGroups` - Network security groups
+**Flexible Input Schema** - All fields are optional with intelligent defaults.
 
 ## 🚀 Quick Deployment Guide
 
@@ -177,58 +132,6 @@ $response | ConvertTo-Json -Depth 5
 }
 ```
 
-### Test 2: Custom Analysis with Prompt
-
-```powershell
-# Test with custom prompt for specific analysis
-$body = @{
-    custom_prompt = "Find all virtual machines that haven't been accessed in 30+ days and calculate the potential monthly savings from deallocation or deletion. Include rightsizing recommendations."
-    subscription_id = "12345678-1234-1234-1234-123456789012"
-    include_recommendations = $true
-    output_format = "detailed"
-} | ConvertTo-Json
-
-Write-Host "Testing custom analysis prompt..."
-$response = Invoke-RestMethod -Uri $triggerUrl -Method POST -Body $body -ContentType "application/json"
-Write-Host "Custom Analysis Results:"
-$response | ConvertTo-Json -Depth 5
-```
-
-### Test 3: Multi-Subscription Cost Optimization
-
-```powershell
-# Test cross-subscription analysis (no subscription_id = analyze all accessible)
-$body = @{
-    analysis_type = "cost_optimization"
-    start_date = "2024-11-01"
-    end_date = "2024-11-09"
-    include_recommendations = $true
-    output_format = "summary"
-} | ConvertTo-Json
-
-Write-Host "Testing multi-subscription cost optimization..."
-$response = Invoke-RestMethod -Uri $triggerUrl -Method POST -Body $body -ContentType "application/json"
-Write-Host "Multi-Subscription Results:"
-$response | ConvertTo-Json -Depth 5
-```
-
-### Test 4: Security and Compliance Review
-
-```powershell
-# Test security-focused analysis
-$body = @{
-    analysis_type = "security_review"
-    resource_types = @("Microsoft.Network/networkSecurityGroups", "Microsoft.Storage/storageAccounts")
-    subscription_id = "12345678-1234-1234-1234-123456789012"
-    output_format = "detailed"
-} | ConvertTo-Json -Depth 3
-
-Write-Host "Testing security review..."
-$response = Invoke-RestMethod -Uri $triggerUrl -Method POST -Body $body -ContentType "application/json"
-Write-Host "Security Analysis Results:"
-$response | ConvertTo-Json -Depth 5
-```
-
 ## 🔧 Customization Options
 
 ### Modify Analysis Prompt
@@ -264,42 +167,6 @@ Modify the `Response` action to format agent responses:
       "resource_type": "@triggerBody()?['resource_types']",
       "agent_response": "@outputs('Compose')",
       "execution_time": "@formatDateTime(utcNow(), 'yyyy-MM-dd HH:mm:ss')"
-    }
-  }
-}
-```
-
-### Add Error Handling
-Insert error handling actions after key steps:
-
-```json
-{
-  "Scope_TryCatch": {
-    "type": "Scope",
-    "actions": {
-      // ... existing actions
-    },
-    "runAfter": {},
-    "trackedProperties": {
-      "operation": "orphaned-resources-analysis"
-    }
-  },
-  "Catch_Errors": {
-    "type": "Scope", 
-    "actions": {
-      "Error_Response": {
-        "type": "Response",
-        "inputs": {
-          "statusCode": 500,
-          "body": {
-            "error": "Analysis failed",
-            "details": "@result('Scope_TryCatch')"
-          }
-        }
-      }
-    },
-    "runAfter": {
-      "Scope_TryCatch": ["Failed", "Skipped", "TimedOut"]
     }
   }
 }
