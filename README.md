@@ -187,6 +187,26 @@ This application provides **two specialized agents** that work together:
 
 ⚠️ **Security Note**: Never commit actual function keys to version control. Use placeholders in templates.
 
+### 🔗 Advanced: Model Context Protocol (MCP) Setup
+
+For enterprise scenarios requiring automated agent triggering and advanced workflow orchestration, you can configure agents to use the **Model Context Protocol (MCP)** through Azure Logic Apps.
+
+**MCP enables**:
+- 🤖 **Automated Agent Triggering** based on Azure alerts, schedules, or business events
+- 🛡️ **Enterprise Security** with OAuth 2.0 and Easy Auth integration
+- 🔧 **Tool Discovery** for agents to automatically find cost analysis capabilities
+- 📊 **Workflow Integration** with existing Logic Apps and enterprise systems
+
+📚 **Complete MCP Setup Guide**: [`docs/mcp/`](docs/mcp/README.md)
+
+**Quick Links**:
+- [MCP Overview & Benefits](docs/mcp/overview.md) - Understand MCP value for cost analysis
+- [Prerequisites Checklist](docs/mcp/prerequisites.md) - Ensure environment readiness  
+- [Step-by-Step Setup](docs/mcp/README.md) - Complete configuration guide
+- [Ready-to-Deploy Workflows](docs/mcp/workflows/) - Logic App templates
+
+**Use Cases**: Daily cost reports, alert-driven analysis, ticket integration, compliance automation
+
 ## 🛠️ Technical Implementation
 
 ### Core Technologies
@@ -386,5 +406,3 @@ az functionapp config appsettings set \
 - **Azure Functions Documentation**: [docs.microsoft.com/azure/azure-functions](https://docs.microsoft.com/azure/azure-functions)
 - **Azure Cost Management API**: [docs.microsoft.com/rest/api/cost-management](https://docs.microsoft.com/rest/api/cost-management)
 - **Azure AI Foundry**: [docs.microsoft.com/azure/ai-foundry](https://docs.microsoft.com/azure/ai-foundry)
-
-secret: Maayan123!

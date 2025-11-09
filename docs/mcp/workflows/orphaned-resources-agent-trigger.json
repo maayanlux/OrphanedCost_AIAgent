@@ -1,0 +1,299 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "contentVersion": "1.0.0.0",
+        "actions": {
+            "Create_Thread": {
+                "type": "ApiConnection",
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "referenceName": "azureagentservice"
+                        }
+                    },
+                    "method": "post",
+                    "body": {
+                        "messages": "@outputs('BuildThreadBody')"
+                    },
+                    "path": "/threads",
+                    "queries": {
+                        "api-version": "2025-05-01"
+                    }
+                },
+                "runAfter": {
+                    "BuildThreadBody": [
+                        "SUCCEEDED"
+                    ]
+                }
+            },
+            "Create_Run": {
+                "type": "ApiConnection",
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "referenceName": "azureagentservice"
+                        }
+                    },
+                    "method": "post",
+                    "body": {
+                        "assistant_id": "YOUR-AGENT-ID-HERE"
+                    },
+                    "path": "/threads/@{encodeURIComponent(body('Create_Thread')['id'])}/runs",
+                    "queries": {
+                        "api-version": "2025-05-01"
+                    }
+                },
+                "runAfter": {
+                    "thread_id": [
+                        "SUCCEEDED"
+                    ]
+                }
+            },
+            "List_Messages": {
+                "type": "ApiConnection",
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "referenceName": "azureagentservice"
+                        }
+                    },
+                    "method": "get",
+                    "path": "/threads/@{encodeURIComponent(body('Create_Thread')['id'])}/messages",
+                    "queries": {
+                        "api-version": "2025-05-01"
+                    }
+                },
+                "runAfter": {
+                    "Get_Run": [
+                        "SUCCEEDED"
+                    ]
+                }
+            },
+            "Compose": {
+                "type": "Compose",
+                "inputs": "@body('List_Messages')['data'][0]['content'][0]['text']['value']",
+                "runAfter": {
+                    "List_Messages": [
+                        "SUCCEEDED"
+                    ]
+                }
+            },
+            "BuildAnalyzeBody": {
+                "type": "Compose",
+                "inputs": "\n@{concat(\r\n  coalesce(triggerBody()?['custom_prompt'], \r\n    concat(\r\n      'Analyze my Azure environment and find ',\r\n      coalesce(triggerBody()?['analysis_type'], 'cost optimization opportunities'),\r\n      if(not(empty(triggerBody()?['resource_types'])), concat(' for resource types: ', triggerBody()?['resource_types']), ''),\r\n      if(and(not(empty(triggerBody()?['start_date'])), not(empty(triggerBody()?['end_date']))), concat(' from ', triggerBody()?['start_date'], ' to ', triggerBody()?['end_date']), ''),\r\n      if(not(empty(triggerBody()?['subscription_id'])), concat(' in subscription ', triggerBody()?['subscription_id']), ' across all accessible subscriptions'),\r\n      '. Provide actionable recommendations with cost impact estimates.'\r\n    )\r\n  )\r\n)}",
+                "runAfter": {}
+            },
+            "BuildThreadBody": {
+                "type": "Compose",
+                "inputs": "@json(concat('[{\"role\":\"user\",\"content\":\"', replace(outputs('BuildAnalyzeBody'), '\"', '\\\"'), '\"}]'))",
+                "runAfter": {
+                    "BuildAnalyzeBody": [
+                        "SUCCEEDED"
+                    ]
+                }
+            },
+            "thread_id": {
+                "type": "InitializeVariable",
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "thread_id",
+                            "type": "string",
+                            "value": "@{outputs('Create_Thread')?['thread_id']}"
+                        }
+                    ]
+                },
+                "runAfter": {
+                    "Create_Thread": [
+                        "SUCCEEDED"
+                    ]
+                }
+            },
+            "runStatus": {
+                "type": "InitializeVariable",
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "status",
+                            "type": "string",
+                            "value": "in_progress"
+                        }
+                    ]
+                },
+                "runAfter": {
+                    "Create_Run": [
+                        "SUCCEEDED"
+                    ]
+                }
+            },
+            "Until": {
+                "type": "Until",
+                "expression": "@equals(variables('status'), 'completed')",
+                "limit": {
+                    "count": 60,
+                    "timeout": "PT5M"
+                },
+                "actions": {
+                    "Set_variable-runStatus_": {
+                        "type": "SetVariable",
+                        "inputs": {
+                            "name": "status",
+                            "value": "@body('GET-Status')['status']"
+                        },
+                        "runAfter": {
+                            "GET-Status": [
+                                "SUCCEEDED"
+                            ]
+                        }
+                    },
+                    "Delay": {
+                        "type": "Wait",
+                        "inputs": {
+                            "interval": {
+                                "count": 10,
+                                "unit": "Second"
+                            }
+                        }
+                    },
+                    "GET-Status": {
+                        "type": "Http",
+                        "inputs": {
+                            "uri": "https://YOUR-AI-FOUNDRY-ENDPOINT.services.ai.azure.com/api/projects/YOUR-PROJECT-NAME/threads/@{body('Create_Thread')['id']}/runs/@{body('Create_Run')?['id']}?api-version=2025-05-01",
+                            "method": "GET",
+                            "headers": {
+                                "Content-Type": "application/json"
+                            },
+                            "authentication": {
+                                "type": "ManagedServiceIdentity",
+                                "audience": "https://ai.azure.com"
+                            }
+                        },
+                        "runAfter": {
+                            "Delay": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "runtimeConfiguration": {
+                            "contentTransfer": {
+                                "transferMode": "Chunked"
+                            }
+                        }
+                    }
+                },
+                "runAfter": {
+                    "runStatus": [
+                        "SUCCEEDED"
+                    ]
+                }
+            },
+            "Response": {
+                "type": "Response",
+                "kind": "Http",
+                "inputs": {
+                    "statusCode": 200,
+                    "headers": {
+                        "Content-Type": "application/json"
+                    },
+                    "body": {
+                        "request_id": "@workflow()['run']['name']",
+                        "timestamp": "@utcNow()",
+                        "analysis_type": "@coalesce(triggerBody()?['analysis_type'], 'orphaned_resources')",
+                        "subscription_analyzed": "@coalesce(triggerBody()?['subscription_id'], 'all_accessible')",
+                        "date_range": {
+                            "start": "@triggerBody()?['start_date']",
+                            "end": "@triggerBody()?['end_date']"
+                        },
+                        "agent_response": "@outputs('Compose')",
+                        "execution_time_seconds": "@div(sub(ticks(utcNow()), ticks(workflow()['run']['startTime'])), 10000000)"
+                    }
+                },
+                "runAfter": {
+                    "Compose": [
+                        "SUCCEEDED"
+                    ]
+                }
+            },
+            "Get_Run": {
+                "type": "ApiConnection",
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "referenceName": "azureagentservice"
+                        }
+                    },
+                    "method": "post",
+                    "path": "/threads/@{encodeURIComponent(body('Create_Thread')['id'])}/runs/@{encodeURIComponent(body('Create_Run')?['id'])}",
+                    "queries": {
+                        "api-version": "2025-05-01"
+                    }
+                },
+                "runAfter": {
+                    "Until": [
+                        "SUCCEEDED"
+                    ]
+                }
+            }
+        },
+        "outputs": {},
+        "triggers": {
+            "When_an_HTTP_request_is_received": {
+                "type": "Request",
+                "description": "This trigger starts the workflow when the trigger's URL gets an HTTPS request. The workflow calls the agent 'Agent-OrphanedResources' and returns the cost analysis of those resources.",
+                "kind": "Http",
+                "inputs": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "analysis_type": {
+                                "type": "string",
+                                "description": "Type of analysis to perform",
+                                "enum": ["orphaned_resources", "cost_optimization", "security_review", "compliance_check"],
+                                "default": "orphaned_resources"
+                            },
+                            "resource_types": {
+                                "type": "array",
+                                "description": "Array of Azure resource types to analyze",
+                                "items": {
+                                    "type": "string",
+                                    "examples": ["Microsoft.Network/publicIPAddresses", "Microsoft.Compute/disks", "Microsoft.Network/networkInterfaces", "Microsoft.Compute/virtualMachines"]
+                                }
+                            },
+                            "subscription_id": {
+                                "type": "string",
+                                "description": "Azure subscription ID to analyze (optional - if empty, analyzes all accessible subscriptions)",
+                                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                            },
+                            "start_date": {
+                                "type": "string",
+                                "description": "Start date for cost analysis in YYYY-MM-DD format",
+                                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                            },
+                            "end_date": {
+                                "type": "string",
+                                "description": "End date for cost analysis in YYYY-MM-DD format",
+                                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                            },
+                            "custom_prompt": {
+                                "type": "string",
+                                "description": "Custom analysis prompt to override default behavior (optional)"
+                            },
+                            "include_recommendations": {
+                                "type": "boolean",
+                                "description": "Whether to include actionable recommendations in response",
+                                "default": true
+                            },
+                            "output_format": {
+                                "type": "string",
+                                "description": "Preferred output format for results",
+                                "enum": ["detailed", "summary", "json", "csv"],
+                                "default": "detailed"
+                            }
+                        }
+                    }
+                },
+                "conditions": []
+            }
+        }
+    },
+    "kind": "Stateful"
+}
