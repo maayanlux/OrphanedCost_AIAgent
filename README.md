@@ -2,6 +2,52 @@
 
 A comprehensive Azure Functions application that provides cost analysis and orphaned resource detection across Azure subscriptions. This application integrates with Azure AI Foundry agents to provide intelligent resource management and cost optimization recommendations.
 
+## ⚠️ **IMPORTANT SECURITY DISCLAIMER**
+
+> **🚨 CRITICAL NOTICE: This solution does NOT use private endpoints and communicates over public internet with Azure APIs.**
+>
+> **IMPLEMENTATION RESPONSIBILITY**: Any organization or individual implementing this solution must:
+> - **Review the entire codebase** to ensure it meets their security requirements
+> - **Validate that the solution aligns** with their organizational security policies  
+> - **Assess network security implications** of public endpoint usage
+> - **Implement additional security measures** as required by their environment
+> - **Take full responsibility** for the security implications of deployment
+>
+> **Microsoft, the solution authors, and contributors assume NO RESPONSIBILITY for security breaches, data exposure, or policy violations that may result from implementing this solution. The implementation and security review responsibility lies entirely with the implementing party.**
+
+## 🏗️ Infrastructure Requirements
+
+### Azure Functions
+- **Service Plan**: Premium EP1 (minimum 1 instance)
+- **Operating System**: Linux
+- **Runtime**: Python 3.11
+- **Authentication**: Managed Identity (System-assigned recommended)
+
+### Required Azure Permissions
+The Azure Functions Managed Identity requires the following role assignments:
+
+#### Storage Account Permissions
+- **Storage Blob Data Owner** - On the Function App's Storage Account
+
+#### Subscription/Tenant Level Permissions  
+Assign these roles on the scope you want to analyze (subscription or management group):
+- **Reader** - For resource enumeration and details
+- **Cost Management Reader** - For accessing cost data and billing information
+- **Advisor Recommendations Contributor** - For assessments and reviews access
+
+### Azure AI Foundry Requirements
+- **Azure AI Foundry Resource** - Foundry resource for AI orchestration
+- **Azure AI Foundry Project** - Project workspace within the Foundry
+- **Connection Configuration** - Proper endpoint and authentication setup between Foundry agents and Functions
+
+### Network Requirements
+> ⚠️ **Security Note**: This solution uses **public endpoints** for all Azure service communications. No private endpoint or VNET integration is configured.
+
+### Python Dependencies
+- **Python Runtime**: 3.11 (as specified in requirements.txt)
+- **Azure SDK Libraries**: For Cost Management, Resource Graph, and ARM APIs
+- **Function Runtime**: Azure Functions v4
+
 ## 🏗️ Architecture
 
 ```mermaid
@@ -126,7 +172,6 @@ This application provides **two specialized agents** that work together:
 
 ### Integration Benefits
 
-- **Seamless Workflow**: Agents can work independently or in sequence
 - **Real-time Data**: Direct Azure API integration for accurate results
 - **Cost Optimization**: Immediate identification of potential savings
 - **Flexible Deployment**: Support for single subscription or tenant-wide analysis
@@ -146,7 +191,7 @@ This application provides **two specialized agents** that work together:
 
 ### Core Technologies
 - **Azure Functions v4**: Serverless compute platform
-- **Python 3.7-3.12**: Runtime environment
+- **Python 3.11**: Runtime environment (required version)
 - **Azure SDK for Python**: Azure service integration
 - **Azure Cost Management API**: Real-time cost data
 - **Azure Resource Graph**: Resource querying and filtering
@@ -228,12 +273,83 @@ After deployment, you'll need to deploy the function code using: `func azure fun
 For detailed deployment options and customization, see the [deploy folder](./deploy/).
 
 ### Prerequisites
-- Azure subscription
-- Azure Functions Core Tools
-- Python 3.7-3.12
-- Azure CLI
+- **Azure Subscription** with appropriate billing permissions
+- **Azure Functions Core Tools v4**
+- **Python 3.11** (required version)
+- **Azure CLI** with permissions to create resources
+- **Azure AI Foundry** access for agent configuration
 
-### Local Development
+### Step 1: Create Azure Function App
+```bash
+# Create resource group
+az group create --name rg-cost-analyzer --location eastus2
+
+# Create storage account for Function App
+az storage account create \
+  --name sacostanalyzer$(date +%s) \
+  --resource-group rg-cost-analyzer \
+  --location eastus2 \
+  --sku Standard_LRS
+
+# Create Function App with Premium EP1 plan on Linux
+az functionapp plan create \
+  --resource-group rg-cost-analyzer \
+  --name plan-cost-analyzer \
+  --location eastus2 \
+  --number-of-workers 1 \
+  --sku EP1 \
+  --is-linux
+
+az functionapp create \
+  --resource-group rg-cost-analyzer \
+  --plan plan-cost-analyzer \
+  --name func-cost-analyzer-$(date +%s) \
+  --storage-account sacostanalyzer \
+  --runtime python \
+  --runtime-version 3.11 \
+  --os-type Linux \
+  --assign-identity
+```
+
+### Step 2: Configure Managed Identity Permissions
+```bash
+# Get the Function App's Managed Identity Object ID
+FUNCTION_PRINCIPAL_ID=$(az functionapp identity show \
+  --name your-function-app-name \
+  --resource-group rg-cost-analyzer \
+  --query principalId -o tsv)
+
+# Assign Storage Blob Data Owner on Function's Storage Account
+az role assignment create \
+  --assignee $FUNCTION_PRINCIPAL_ID \
+  --role "Storage Blob Data Owner" \
+  --scope "/subscriptions/YOUR_SUBSCRIPTION_ID/resourceGroups/rg-cost-analyzer/providers/Microsoft.Storage/storageAccounts/YOUR_STORAGE_ACCOUNT"
+
+# Assign Reader role (replace with your target scope)
+az role assignment create \
+  --assignee $FUNCTION_PRINCIPAL_ID \
+  --role "Reader" \
+  --scope "/subscriptions/YOUR_TARGET_SUBSCRIPTION_ID"
+
+# Assign Cost Management Reader role
+az role assignment create \
+  --assignee $FUNCTION_PRINCIPAL_ID \
+  --role "Cost Management Reader" \
+  --scope "/subscriptions/YOUR_TARGET_SUBSCRIPTION_ID"
+
+# Assign Advisor Recommendations Contributor role
+az role assignment create \
+  --assignee $FUNCTION_PRINCIPAL_ID \
+  --role "Advisor Recommendations Contributor" \
+  --scope "/subscriptions/YOUR_TARGET_SUBSCRIPTION_ID"
+```
+
+### Step 3: Set Up Azure AI Foundry
+1. **Create Azure AI Foundry Project**:
+   - Navigate to Azure portal → Create Resource → Azure AI Foundry
+   - Create a new Project for agent orchestration
+
+### Step 4: Local Development
 ```bash
 # Install dependencies
 pip install -r requirements.txt
@@ -242,13 +358,36 @@ pip install -r requirements.txt
 func host start
 ```
 
-### Azure Deployment
+### Step 5: Deploy to Azure
 ```bash
 # Deploy to Azure Functions
-func azure functionapp publish your-function-app-name
+func azure functionapp publish your-function-app-name --python
+```
+
+### Step 6: Configure Application Settings
+```bash
+# Set any required application settings
+az functionapp config appsettings set \
+  --name your-function-app-name \
+  --resource-group rg-cost-analyzer \
+  --settings "ENVIRONMENT=production"
 ```
 
 ## 🔧 Configuration
+
+### ⚠️ Security Configuration Review Required
+> **Before deploying to production, organizations must:**
+> - Review all code for compliance with security policies
+> - Assess the implications of public endpoint usage
+> - Implement additional security controls as needed
+> - Ensure proper network segmentation and access controls
+
+### Application Configuration
+- **Function Plan**: Premium EP1 minimum (for consistent performance)
+- **Operating System**: Linux (required for Python 3.11 runtime)
+- **Python Version**: 3.11 (specified in function configuration)
+- **Network Access**: Public endpoints (no private endpoint integration)
+- **Authentication**: System-assigned Managed Identity with required permissions (see Infrastructure Requirements above)
 
 ### Cost Analysis Settings
 - **Default Date Range**: Last 30 days
@@ -261,16 +400,21 @@ func azure functionapp publish your-function-app-name
 - **Azure Hybrid Benefit**: Windows Server, RHEL, SLES only
 - **Cost Integration**: Optional cost analysis for detected resources
 
-### Required Azure Permissions
-This application requires appropriate Azure permissions for:
-- **Cost Management API**: Reader role on subscription/billing scope
-- **Resource Graph API**: Reader role on subscription
-- **Azure Resource Manager**: Reader role on subscription
+### Azure AI Foundry Configuration
+- **Foundry Project**: Workspace for managing agents and connections
+- **Agent Connections**: Configure using files in `Agents/` folder
+- **Authentication**: Function Keys for API access
 
-Ensure your service principal or managed identity has the necessary roles assigned.
+### Network Security Considerations
+> ⚠️ **Important**: This solution communicates over public internet:
+> - All Azure API calls use public endpoints
+> - No VNET integration or private endpoints configured
+> - Implement additional network security as per your organization's requirements
 
 ## 📖 Additional Resources
 
 - **Azure Functions Documentation**: [docs.microsoft.com/azure/azure-functions](https://docs.microsoft.com/azure/azure-functions)
 - **Azure Cost Management API**: [docs.microsoft.com/rest/api/cost-management](https://docs.microsoft.com/rest/api/cost-management)
 - **Azure AI Foundry**: [docs.microsoft.com/azure/ai-foundry](https://docs.microsoft.com/azure/ai-foundry)
+
+secret: Maayan123!

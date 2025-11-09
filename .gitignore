@@ -127,12 +127,17 @@ bin
 obj
 appsettings.json
 local.settings.json
+host.json
 
 # Azurite artifacts
 __blobstorage__
 __queuestorage__
 __azurite_db*__.json
 .python_packages
+
+# MCP and utility scripts
+mcp.json
+checkMCP-url.ps1
 
 # Test files and debugging utilities
 tests/
