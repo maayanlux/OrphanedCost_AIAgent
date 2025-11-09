@@ -1,0 +1,84 @@
+# Pre-commit hooks configuration for secret scanning
+# Install with: pip install pre-commit && pre-commit install
+
+repos:
+  - repo: https://github.com/trufflesecurity/trufflehog
+    rev: v3.63.2
+    hooks:
+      - id: trufflehog
+        name: TruffleHog
+        description: Detect hardcoded secrets
+        entry: bash -c 'trufflehog git file://. --since-commit HEAD --only-verified --fail'
+        language: system
+        stages: [commit, push]
+
+  - repo: https://github.com/zricethezav/gitleaks
+    rev: v8.18.0
+    hooks:
+      - id: gitleaks
+
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: package.lock.json
+
+  - repo: https://github.com/secretlint/secretlint
+    rev: v8.1.0
+    hooks:
+      - id: secretlint
+
+  - repo: local
+    hooks:
+      - id: check-azure-secrets
+        name: Check Azure Secrets
+        entry: bash -c 'grep -r -E "(DefaultEndpointsProtocol=|AccountKey=|SharedAccessSignature=)" --exclude-dir=.git . && exit 1 || exit 0'
+        language: system
+        pass_filenames: false
+
+      - id: check-high-entropy
+        name: Check High Entropy Strings
+        entry: python3
+        language: system
+        files: \.(py|js|ts|json|yaml|yml)$
+        args:
+          - -c
+          - |
+            import sys
+            import re
+            import math
+            from collections import Counter
+            
+            def calculate_entropy(s):
+                if len(s) == 0: return 0
+                entropy = 0
+                for count in Counter(s).values():
+                    p = count / len(s)
+                    entropy -= p * math.log2(p)
+                return entropy
+            
+            for filepath in sys.argv[1:]:
+                try:
+                    with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+                        content = f.read()
+                    # Look for potential secrets
+                    patterns = [r'[A-Za-z0-9+/]{40,}={0,2}', r'[a-fA-F0-9]{64,}']
+                    for pattern in patterns:
+                        for match in re.finditer(pattern, content):
+                            if calculate_entropy(match.group()) > 4.5:
+                                print(f"High entropy in {filepath}: {match.group()[:50]}...")
+                                sys.exit(1)
+                except Exception as e:
+                    continue
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+      - id: check-yaml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
