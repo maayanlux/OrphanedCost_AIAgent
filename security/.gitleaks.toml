@@ -1,0 +1,99 @@
+# GitLeaks configuration file
+# https://github.com/zricethezav/gitleaks#configuration
+
+title = "gitleaks config for comprehensive secret detection"
+
+[extend]
+# Use the default gitleaks config as base
+useDefault = true
+
+[[rules]]
+id = "azure-storage-key"
+description = "Azure Storage Account Key"
+regex = '''[a-zA-Z0-9+/]{86}=='''
+keywords = [
+    "AccountKey",
+    "account-key",
+    "storage-key"
+]
+
+[[rules]]
+id = "azure-connection-string"
+description = "Azure Connection String"
+regex = '''DefaultEndpointsProtocol=https;AccountName=[^;]+;AccountKey=[^;]+'''
+keywords = [
+    "DefaultEndpointsProtocol",
+    "AccountName",
+    "AccountKey"
+]
+
+[[rules]]
+id = "openai-api-key"
+description = "OpenAI API Key"
+regex = '''sk-[a-zA-Z0-9]{48}'''
+keywords = [
+    "openai",
+    "api_key",
+    "sk-"
+]
+
+[[rules]]
+id = "github-pat"
+description = "GitHub Personal Access Token"
+regex = '''ghp_[a-zA-Z0-9]{36}'''
+keywords = [
+    "github",
+    "token",
+    "ghp_"
+]
+
+[[rules]]
+id = "generic-password"
+description = "Generic Password"
+regex = '''(?i)(password|pwd|pass)\s*[:=]\s*['"][^'"]{8,}['"]'''
+keywords = [
+    "password",
+    "pwd",
+    "pass"
+]
+
+[[rules]]
+id = "jwt-token"
+description = "JWT Token"
+regex = '''eyJ[a-zA-Z0-9+/]+\.eyJ[a-zA-Z0-9+/]+\.[a-zA-Z0-9+/]+'''
+keywords = [
+    "jwt",
+    "token",
+    "bearer"
+]
+
+# Allowlist for false positives
+[allowlist]
+description = "global allow lists"
+paths = [
+    '''gitleaks.toml''',
+    '''\.git/''',
+    '''node_modules/''',
+    '''vendor/''',
+    '''\.secrets\.baseline''',
+    '''package-lock\.json''',
+    '''yarn\.lock''',
+    '''go\.sum''',
+]
+
+commits = [
+    # Add specific commit hashes to allowlist if needed
+]
+
+# Example patterns to ignore (add your own)
+regexes = [
+    '''example\.com''',
+    '''localhost''',
+    '''127\.0\.0\.1''',
+    '''placeholder''',
+    '''dummy''',
+    '''fake''',
+    '''test''',
+    '''sample''',
+    '''mock''',
+]
