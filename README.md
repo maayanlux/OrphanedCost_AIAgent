@@ -120,11 +120,6 @@ graph TB
 }
 ```
 
-### 2. GetOrphanedResourcesExample
-**Endpoint**: `/api/orphaned-resources-example`  
-**Method**: GET  
-**Purpose**: Sample orphaned resources with mock data for testing
-
 ### 3. CostAnalysisDirectQuery
 **Endpoint**: `/api/cost-analysis`  
 **Method**: POST  
@@ -142,11 +137,6 @@ graph TB
   "top_n": 10
 }
 ```
-
-### 4. CostManagementExample
-**Endpoint**: `/api/cost-example`  
-**Method**: GET  
-**Purpose**: Sample cost management data for testing and integration
 
 ## 🤖 Azure AI Foundry Agent Integration
 
@@ -207,39 +197,6 @@ For enterprise scenarios requiring automated agent triggering and advanced workf
 
 **Use Cases**: Daily cost reports, alert-driven analysis, ticket integration, compliance automation
 
-## 🛠️ Technical Implementation
-
-### Core Technologies
-- **Azure Functions v4**: Serverless compute platform
-- **Python 3.11**: Runtime environment (required version)
-- **Azure SDK for Python**: Azure service integration
-- **Azure Cost Management API**: Real-time cost data
-- **Azure Resource Graph**: Resource querying and filtering
-
-### Key Features Implementation
-
-#### Rate Limiting Optimization
-- **ClientType Header**: `'ClientType': 'AwesomeType'` prevents 429 rate limiting errors
-- **Progressive Delays**: 2s base + 0.5s per additional resource
-- **Retry Logic**: Exponential backoff with maximum retry attempts
-- **Individual Resource Queries**: More reliable than batch processing
-
-#### Cost Analysis Accuracy
-- **Direct API Integration**: Real-time cost data from Azure Cost Management
-- **Date Range Handling**: Auto-calculation for "last 30 days" or custom ranges
-- **Resource-Specific Filtering**: Precise cost attribution per resource
-- **Date Format Standardization**: ISO 8601 format (UTC) for all date ranges
-
-#### Azure Hybrid Benefit Detection
-- **OS-Specific Filtering**: Only Windows Server, RHEL, and SLES eligible
-- **License Optimization**: Identifies VMs that could benefit from AHB
-- **Cost Impact Analysis**: Calculates potential savings from AHB implementation
-
-### Date Handling Guidelines
-When receiving a relative time range such as "last month" or "previous billing cycle":
-- Resolve dates relative to the current year (today's system date), not a default 2023
-- If only month names are given (e.g., "September"), assume the **most recent** September that has fully passed
-- Always pass start_date and end_date in ISO 8601 format (UTC)
 
 ## 📁 Project Structure
 
@@ -362,44 +319,6 @@ az functionapp config appsettings set \
   --resource-group rg-cost-analyzer \
   --settings "ENVIRONMENT=production"
 ```
-
-## 🔧 Configuration
-
-### ⚠️ Security Configuration Review Required
-> **Before deploying to production, organizations must:**
-> - Review all code for compliance with security policies
-> - Assess the implications of public endpoint usage
-> - Implement additional security controls as needed
-> - Ensure proper network segmentation and access controls
-
-### Application Configuration
-- **Function Plan**: Premium EP1 minimum (for consistent performance)
-- **Operating System**: Linux (required for Python 3.11 runtime)
-- **Python Version**: 3.11 (specified in function configuration)
-- **Network Access**: Public endpoints (no private endpoint integration)
-- **Authentication**: System-assigned Managed Identity with required permissions (see Infrastructure Requirements above)
-
-### Cost Analysis Settings
-- **Default Date Range**: Last 30 days
-- **Rate Limiting**: 2s + 0.5s progressive delays
-- **Retry Attempts**: 3 attempts with exponential backoff
-- **ClientType Header**: 'AwesomeType' for rate limit optimization
-
-### Orphaned Resources Detection
-- **Supported Resource Types**: VM, NIC, PublicIP, Disk, NSG
-- **Azure Hybrid Benefit**: Windows Server, RHEL, SLES only
-- **Cost Integration**: Optional cost analysis for detected resources
-
-### Azure AI Foundry Configuration
-- **Foundry Project**: Workspace for managing agents and connections
-- **Agent Connections**: Configure using files in `Agents/` folder
-- **Authentication**: Function Keys for API access
-
-### Network Security Considerations
-> ⚠️ **Important**: This solution communicates over public internet:
-> - All Azure API calls use public endpoints
-> - No VNET integration or private endpoints configured
-> - Implement additional network security as per your organization's requirements
 
 ## 📖 Additional Resources
 
